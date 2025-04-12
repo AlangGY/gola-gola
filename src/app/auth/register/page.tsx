@@ -5,15 +5,19 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRandomNickname } from "@woowa-babble/random-nickname";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
-interface RegisterPageProps {
-  searchParams: Promise<{
-    code?: string;
-  }>;
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Register />
+    </Suspense>
+  );
 }
 
-export default function Register({ searchParams }: RegisterPageProps) {
+function Register() {
+  const searchParams = useSearchParams();
   const { signup } = useAuth();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
@@ -27,10 +31,7 @@ export default function Register({ searchParams }: RegisterPageProps) {
   // URL 쿼리 파라미터에서 초대 코드 가져오기
   useEffect(() => {
     const resolveSearchParams = async () => {
-      const resolvedSearchParams =
-        searchParams instanceof Promise ? await searchParams : searchParams;
-      console.log(resolvedSearchParams);
-      const codeFromQuery = resolvedSearchParams.code;
+      const codeFromQuery = searchParams.get("code");
       if (codeFromQuery) {
         setInviteCode(codeFromQuery.toUpperCase());
 
