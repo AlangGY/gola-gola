@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRandomNickname } from "@woowa-babble/random-nickname";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function Register() {
   const { signup } = useAuth();
+  const searchParams = useSearchParams();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -16,14 +18,28 @@ export default function Register() {
   const [step, setStep] = useState<"code" | "register">("code");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAutoVerifying, setIsAutoVerifying] = useState(false);
 
-  const verifyInviteCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // URL 쿼리 파라미터에서 초대 코드 가져오기
+  useEffect(() => {
+    const codeFromQuery = searchParams.get("code");
+    if (codeFromQuery) {
+      setInviteCode(codeFromQuery.toUpperCase());
+
+      // 자동으로 초대 코드 검증
+      if (codeFromQuery.trim() !== "") {
+        setIsAutoVerifying(true);
+        verifyInviteCodeInternal(codeFromQuery);
+      }
+    }
+  }, [searchParams]);
+
+  const verifyInviteCodeInternal = async (code: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const isValid = await authService.verifyInviteCode(inviteCode);
+      const isValid = await authService.verifyInviteCode(code);
 
       if (isValid) {
         setStep("register");
@@ -35,7 +51,13 @@ export default function Register() {
       setError("초대 코드 검증 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setLoading(false);
+      setIsAutoVerifying(false);
     }
+  };
+
+  const verifyInviteCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await verifyInviteCodeInternal(inviteCode);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -94,40 +116,46 @@ export default function Register() {
           )}
 
           {step === "code" ? (
-            <form className="space-y-6" onSubmit={verifyInviteCode}>
-              <div>
-                <label
-                  htmlFor="inviteCode"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  초대 코드
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="inviteCode"
-                    name="inviteCode"
-                    type="text"
-                    required
-                    value={inviteCode}
-                    onChange={(e) =>
-                      setInviteCode(e.target.value.toUpperCase())
-                    }
-                    placeholder="초대 코드를 입력하세요 (예: AB123Z)"
-                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                  />
+            isAutoVerifying ? (
+              <div className="flex items-center justify-center py-6">
+                <p className="text-gray-500">초대 코드 확인 중...</p>
+              </div>
+            ) : (
+              <form className="space-y-6" onSubmit={verifyInviteCode}>
+                <div>
+                  <label
+                    htmlFor="inviteCode"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    초대 코드
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="inviteCode"
+                      name="inviteCode"
+                      type="text"
+                      required
+                      value={inviteCode}
+                      onChange={(e) =>
+                        setInviteCode(e.target.value.toUpperCase())
+                      }
+                      placeholder="초대 코드를 입력하세요 (예: AB123Z)"
+                      className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading || !inviteCode}
-                >
-                  {loading ? "확인 중..." : "다음"}
-                </Button>
-              </div>
-            </form>
+                <div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading || !inviteCode}
+                  >
+                    {loading ? "확인 중..." : "다음"}
+                  </Button>
+                </div>
+              </form>
+            )
           ) : (
             <form className="space-y-6" onSubmit={handleRegister}>
               <div>
