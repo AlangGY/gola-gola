@@ -4,6 +4,8 @@ import {
   Gift,
   giftRepository,
 } from "../repositories/giftRepository";
+import { userRepository } from "../repositories/userRepository";
+import { supabase } from "../supabase";
 
 /**
  * 선물 서비스
@@ -101,17 +103,47 @@ export const giftService = {
   },
 
   /**
-   * 사용자가 이벤트에서 선택한 선물 조회
+   * 사용자가 이벤트에서 선택한 선물 조회 (선물 등록자 정보 포함)
    */
   async getUserSelectedGift(
     eventId: string,
     userId: string
-  ): Promise<AnonymousGift | null> {
+  ): Promise<(AnonymousGift & { creator_name?: string }) | null> {
     try {
       const { received } = await giftRepository.getUserGifts(userId);
+
       // 해당 이벤트에서 사용자가 선택한 선물 찾기
       const selectedGift = received.find((gift) => gift.event_id === eventId);
-      return selectedGift || null;
+
+      if (!selectedGift) {
+        return null;
+      }
+
+      // 선물 전체 정보 가져오기 (created_by 필드 포함)
+      const { data, error } = await supabase
+        .from("gifts")
+        .select("created_by")
+        .eq("id", selectedGift.id)
+        .single();
+
+      if (error) {
+        console.error(
+          `선물 등록자 정보 조회 실패 (Gift ID: ${selectedGift.id}):`,
+          error
+        );
+        return selectedGift;
+      }
+
+      // 선물 등록자 정보 조회
+      if (data && data.created_by) {
+        const creatorProfile = await userRepository.getUser(data.created_by);
+        return {
+          ...selectedGift,
+          creator_name: creatorProfile?.username || "익명 사용자",
+        };
+      }
+
+      return selectedGift;
     } catch (error) {
       console.error(
         `사용자 선택 선물 조회 실패 (User ID: ${userId}, Event ID: ${eventId}):`,

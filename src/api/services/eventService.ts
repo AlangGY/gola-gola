@@ -1,7 +1,8 @@
 import { eventParticipantRepository } from "../repositories/eventParticipantRepository";
 import { Event, eventRepository } from "../repositories/eventRepository";
-import { giftRepository } from "../repositories/giftRepository";
+import { Gift } from "../repositories/giftRepository";
 import { userRepository } from "../repositories/userRepository";
+import { supabase } from "../supabase";
 
 /**
  * 이벤트 서비스
@@ -144,6 +145,8 @@ export const eventService = {
       user_id: string;
       username: string | null;
       has_selected_gift: boolean;
+      selected_gift_description?: string;
+      selected_gift_creator_name?: string;
     }[]
   > {
     try {
@@ -155,25 +158,59 @@ export const eventService = {
         return [];
       }
 
-      // 2. 참가자들에 대한 선물 선택 여부 확인 및 사용자 정보 조회
+      // 2. 모든 선물 정보 조회 (한 번에 가져와서 메모리에 저장)
+      const { data: allGifts, error: giftsError } = await supabase
+        .from("gifts")
+        .select("id, event_id, description, created_by, received_by, status")
+        .eq("event_id", eventId);
+
+      if (giftsError) {
+        throw giftsError;
+      }
+
+      // 3. 사용자 정보 캐시 생성
+      const userCache = new Map();
+      const getUserInfo = async (userId: string) => {
+        if (userCache.has(userId)) {
+          return userCache.get(userId);
+        }
+        const userInfo = await userRepository.getUser(userId);
+        userCache.set(userId, userInfo);
+        return userInfo;
+      };
+
+      // 4. 참가자들에 대한 선물 선택 여부 확인 및 사용자 정보 조회
       const participantsWithInfo = await Promise.all(
         participants.map(async (participant) => {
-          // 2-1. 사용자 정보 조회
-          const userProfile = await userRepository.getUser(participant.user_id);
+          // 4-1. 사용자 정보 조회
+          const userProfile = await getUserInfo(participant.user_id);
 
-          // 2-2. 사용자가 이 이벤트에서 선물을 선택했는지 확인
-          const { received } = await giftRepository.getUserGifts(
-            participant.user_id
+          // 4-2. 사용자가 선택한 선물 찾기
+          const selectedGift = allGifts.find(
+            (
+              gift: Pick<
+                Gift,
+                "received_by" | "event_id" | "description" | "created_by"
+              >
+            ) =>
+              gift.received_by === participant.user_id &&
+              gift.event_id === eventId
           );
-          const hasSelectedGift = received.some(
-            (gift) => gift.event_id === eventId
-          );
+
+          // 4-3. 선물이 있는 경우 선물 등록자 정보 조회
+          let creatorName = null;
+          if (selectedGift) {
+            const creatorProfile = await getUserInfo(selectedGift.created_by);
+            creatorName = creatorProfile?.username || "익명 사용자";
+          }
 
           return {
             id: participant.id,
             user_id: participant.user_id,
             username: userProfile?.username || null,
-            has_selected_gift: hasSelectedGift,
+            has_selected_gift: !!selectedGift,
+            selected_gift_description: selectedGift?.description,
+            selected_gift_creator_name: creatorName,
           };
         })
       );
