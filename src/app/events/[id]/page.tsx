@@ -140,35 +140,75 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
   // 폴링 설정
   useEffect(() => {
-    const startPolling = () => {
-      if (isPolling || !user || !eventId || !isParticipant) return;
+    console.log("폴링 설정 실행");
+    // 폴링 시작 조건이 맞지 않으면 함수 실행하지 않음
+    console.log("user", user);
+    console.log("eventId", eventId);
+    console.log("isParticipant", isParticipant);
+    console.log("loading", loading);
+    if (!user || !eventId || !isParticipant || loading) return;
 
-      // 이미 진행 중인 폴링이 있으면 제거
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
+    console.log("폴링 시작 조건 확인");
+    console.log("isPolling", isPolling);
+    console.log("pollingIntervalRef.current", pollingIntervalRef.current);
+    // 이미 폴링 중이면 새로 시작하지 않음
+    if (isPolling && pollingIntervalRef.current) return;
 
-      // 새로운 폴링 시작
-      setIsPolling(true);
-      pollingIntervalRef.current = setInterval(() => {
-        console.log("이벤트 데이터 폴링 중...");
-        fetchEventDetails(false); // 로딩 표시 없이 조용히 업데이트
-      }, POLLING_INTERVAL);
-    };
+    console.log("폴링 시작");
 
-    // 사용자가 로그인하고 이벤트 참가자인 경우 폴링 시작
-    if (user && eventId && isParticipant && !isPolling && !loading) {
-      startPolling();
+    // 이전 폴링이 있다면 제거
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
     }
+
+    // 폴링 상태 설정
+    setIsPolling(true);
+
+    // 새로운 폴링 시작
+    pollingIntervalRef.current = setInterval(() => {
+      console.log("이벤트 데이터 폴링 중...");
+      // 조용히 업데이트하기 위해 fetchEventDetails 직접 호출하지 않고
+      // 비동기 함수로 래핑하여 실행
+      (async () => {
+        try {
+          if (!user || !eventId) return;
+
+          // 1. 이벤트 정보 조회
+          const eventDetails = await eventService.getEventDetail(eventId);
+          if (!eventDetails) return;
+          setEvent(eventDetails);
+
+          // 2. 이벤트 선물 목록 조회
+          const giftList = await giftService.getAvailableGifts(eventId);
+          setGifts(giftList);
+
+          // 3. 사용자가 이미 선택한 선물이 있는지 확인
+          const selectedGift = await giftService.getUserSelectedGift(
+            eventId,
+            user.id
+          );
+          setUserSelectedGift(selectedGift);
+
+          // 4. 이벤트 참가자 목록 조회
+          const participantsList =
+            await eventService.getEventParticipantsWithGiftStatus(eventId);
+          setParticipants(participantsList);
+        } catch (error) {
+          console.error("폴링 중 오류 발생:", error);
+        }
+      })();
+    }, POLLING_INTERVAL);
 
     // 클린업 함수
     return () => {
+      console.log("폴링 정리");
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
         setIsPolling(false);
       }
     };
-  }, [user, eventId, isParticipant, isPolling, loading, fetchEventDetails]);
+  }, [user?.id, eventId, isParticipant, loading, isPolling]); // fetchEventDetails와 loading, isPolling 의존성 제거
 
   // 이벤트가 완료되거나 취소된 경우 폴링 중지
   useEffect(() => {
@@ -178,10 +218,11 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     ) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
         setIsPolling(false);
       }
     }
-  }, [event]);
+  }, [event?.status]); // event 객체 전체가 아닌 status만 의존성에 추가
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -297,7 +338,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
         <p className="text-gray-500 mb-4">
           요청하신 이벤트가 존재하지 않거나 접근 권한이 없습니다.
         </p>
-        <Link href="/events" passHref>
+        <Link href="/events">
           <Button>이벤트 목록으로</Button>
         </Link>
       </div>
@@ -476,7 +517,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                     본 이벤트에 선물을 등록하고 다른 참여자의 선물을 선택할 수
                     있습니다.
                   </p>
-                  <Link href={`/events/${eventId}/register-gift`} passHref>
+                  <Link href={`/events/${eventId}/register-gift`}>
                     <Button className="w-full">선물 등록하기</Button>
                   </Link>
                 </div>

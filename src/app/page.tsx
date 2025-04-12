@@ -23,12 +23,12 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <Link href="/auth/register" passHref>
+            <Link href="/auth/register">
               <Button size="lg" className="font-medium">
                 초대코드로 시작하기
               </Button>
             </Link>
-            <Link href="/events" passHref>
+            <Link href="/events">
               <Button size="lg" variant="outline" className="font-medium">
                 이벤트 둘러보기
               </Button>
@@ -197,7 +197,7 @@ export default function Home() {
               친구들과 특별한 선물 교환 경험을 만들어보세요. 간단한 초대 코드만
               있으면 누구나 쉽게 시작할 수 있습니다.
             </p>
-            <Link href="/auth/register" passHref>
+            <Link href="/auth/register">
               <Button
                 size="lg"
                 className="bg-white text-indigo-700 hover:bg-indigo-50"
