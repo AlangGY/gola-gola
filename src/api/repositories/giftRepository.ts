@@ -42,12 +42,12 @@ export const giftRepository = {
       .from("gifts")
       .select("id, event_id, description, created_at, status")
       .eq("event_id", eventId)
-      .eq("status", "available")
+      .in("status", ["available", "selected"])
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    return data ? shuffleArray(data) : [];
+    return data || [];
   },
 
   async selectGift(giftId: string, userId: string): Promise<void> {
@@ -114,13 +114,31 @@ export const giftRepository = {
 
     if (error) throw error;
   },
-};
 
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
+  /**
+   * 선물 ID로 선물 조회
+   */
+  async getGiftById(
+    giftId: string
+  ): Promise<{ data: Gift | null; error: Error | null }> {
+    try {
+      const { data, error } = await supabase
+        .from("gifts")
+        .select("*")
+        .eq("id", giftId)
+        .single();
+
+      if (error) {
+        return { data: null, error };
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return {
+        data: null,
+        error:
+          error instanceof Error ? error : new Error("Unknown error occurred"),
+      };
+    }
+  },
+};

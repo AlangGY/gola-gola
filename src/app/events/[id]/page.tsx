@@ -5,6 +5,8 @@ import { Event } from "@/api/repositories/eventRepository";
 import { AnonymousGift } from "@/api/repositories/giftRepository";
 import { eventService } from "@/api/services/eventService";
 import { giftService } from "@/api/services/giftService";
+import { EventReviews } from "@/components/EventReviews";
+import { GiftReview } from "@/components/GiftReview";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
@@ -743,6 +745,52 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 리뷰 섹션 - 이벤트가 active 상태일 때만 표시 */}
+      {isParticipant && event.status === "active" && (
+        <div className="mt-12">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">
+              선물 리뷰
+            </h2>
+
+            {/* 내가 받은 선물에 대한 리뷰 작성 섹션 */}
+            {userSelectedGift && (
+              <div className="mb-8">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">
+                  내가 받은 선물 리뷰
+                </h3>
+                <GiftReview giftId={userSelectedGift.id} />
+              </div>
+            )}
+
+            {/* 모든 선물에 대한 리뷰 작성 섹션 */}
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">
+                다른 선물 리뷰 작성
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {gifts
+                  .filter((gift) => gift.id !== userSelectedGift?.id)
+                  .map((gift) => (
+                    <div
+                      key={gift.id}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
+                      <div className="font-medium mb-2">{gift.description}</div>
+                      <GiftReview giftId={gift.id} />
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* 이벤트 내 모든 리뷰 표시 */}
+            <div className="mt-10">
+              <EventReviews eventId={eventId} />
+            </div>
           </div>
         </div>
       )}
