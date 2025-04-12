@@ -29,6 +29,7 @@ export default function Register({ searchParams }: RegisterPageProps) {
     const resolveSearchParams = async () => {
       const resolvedSearchParams =
         searchParams instanceof Promise ? await searchParams : searchParams;
+      console.log(resolvedSearchParams);
       const codeFromQuery = resolvedSearchParams.code;
       if (codeFromQuery) {
         setInviteCode(codeFromQuery.toUpperCase());

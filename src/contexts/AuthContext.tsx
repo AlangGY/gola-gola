@@ -2,8 +2,6 @@
 
 import { User, userRepository } from "@/api/repositories/userRepository";
 import { authService, AuthUser } from "@/api/services/authService";
-import { supabase } from "@/api/supabase";
-import { Session } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import {
   createContext,
@@ -37,25 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        // 세션 확인
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error("세션 확인 실패:", sessionError);
-          setUser(null);
-          setIsLoading(false);
-          return;
-        }
-
-        if (!sessionData.session) {
-          // 세션이 없으면 사용자는 로그인하지 않은 상태
-          setUser(null);
-          setIsLoading(false);
-          return;
-        }
-
-        // 현재 사용자 정보 가져오기
         const currentUser = await authService.getCurrentUser();
 
         if (currentUser) {
@@ -85,44 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // 초기 사용자 상태 확인
     checkUser();
-
-    // 인증 상태 변경 리스너 설정
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event: string, session: Session | null) => {
-        console.log("Auth state changed:", event);
-
-        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-          if (session) {
-            const authUser = await authService.getCurrentUser();
-            if (authUser) {
-              try {
-                const userProfile = await userRepository.getUser(authUser.id);
-                if (userProfile) {
-                  setUser({
-                    ...authUser,
-                    ...userProfile,
-                  });
-                } else {
-                  setUser(authUser);
-                }
-              } catch (error) {
-                console.error("사용자 프로필 정보 조회 실패:", error);
-                setUser(authUser);
-              }
-            }
-          }
-        } else if (event === "SIGNED_OUT") {
-          setUser(null);
-        }
-      }
-    );
-
-    // 컴포넌트 언마운트 시 리스너 제거
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
   }, []);
 
   const login = async (email: string, password: string) => {
