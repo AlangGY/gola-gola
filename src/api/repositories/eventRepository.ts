@@ -8,7 +8,12 @@ export interface Event {
   created_by: string;
   start_date: string;
   end_date: string;
-  status: "active" | "completed" | "cancelled";
+  status:
+    | "gift_registration"
+    | "gift_selection"
+    | "active"
+    | "completed"
+    | "cancelled";
   created_at: string;
 }
 
@@ -24,7 +29,7 @@ export const eventRepository = {
       .insert([
         {
           ...event,
-          status: "active",
+          status: "gift_registration",
           created_by: user.user?.id,
         },
       ])
@@ -50,7 +55,7 @@ export const eventRepository = {
     const { data, error } = await supabase
       .from("events")
       .select("*")
-      .eq("status", "active")
+      .in("status", ["gift_registration", "gift_selection", "active"])
       .gt("end_date", new Date().toISOString());
 
     if (error) throw error;

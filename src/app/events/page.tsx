@@ -35,9 +35,12 @@ export default function EventsPage() {
         if (user) {
           const userEvents = await eventService.getUserEvents(user.id);
 
-          // 활성 상태인 이벤트만 필터링
+          // 진행 중인 이벤트만 필터링 (gift_registration, gift_selection, active 상태)
           const activeUserEvents = userEvents.filter(
-            (event) => event.status === "active"
+            (event) =>
+              event.status === "gift_registration" ||
+              event.status === "gift_selection" ||
+              event.status === "active"
           );
 
           setMyEvents(activeUserEvents);
@@ -78,6 +81,42 @@ export default function EventsPage() {
     });
   };
 
+  // 이벤트 상태에 따른 표시 텍스트
+  const getEventStatusText = (status: string) => {
+    switch (status) {
+      case "gift_registration":
+        return "상품 등록 단계";
+      case "gift_selection":
+        return "상품 선택 단계";
+      case "active":
+        return "진행중";
+      case "completed":
+        return "완료됨";
+      case "cancelled":
+        return "취소됨";
+      default:
+        return "상태 미정";
+    }
+  };
+
+  // 이벤트 상태에 따른 배경색
+  const getEventStatusColor = (status: string) => {
+    switch (status) {
+      case "gift_registration":
+        return "bg-blue-100 text-blue-800";
+      case "gift_selection":
+        return "bg-purple-100 text-purple-800";
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-gray-100 text-gray-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
   // 이벤트 참가 처리 함수
   const handleJoinEvent = async () => {
     if (!user || !selectedEvent) return;
@@ -107,12 +146,12 @@ export default function EventsPage() {
       <div className="bg-white rounded-lg shadow p-6 h-full hover:shadow-md transition-shadow">
         <div className="flex justify-between items-start">
           <h2 className="text-xl font-semibold text-gray-900">{event.title}</h2>
-          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            {event.status === "active"
-              ? "진행중"
-              : event.status === "completed"
-              ? "완료됨"
-              : "취소됨"}
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${getEventStatusColor(
+              event.status
+            )}`}
+          >
+            {getEventStatusText(event.status)}
           </span>
         </div>
         <p className="mt-2 text-gray-600 line-clamp-2">{event.description}</p>
@@ -146,12 +185,12 @@ export default function EventsPage() {
     >
       <div className="flex justify-between items-start">
         <h2 className="text-xl font-semibold text-gray-900">{event.title}</h2>
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          {event.status === "active"
-            ? "진행중"
-            : event.status === "completed"
-            ? "완료됨"
-            : "취소됨"}
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${getEventStatusColor(
+            event.status
+          )}`}
+        >
+          {getEventStatusText(event.status)}
         </span>
       </div>
       <p className="mt-2 text-gray-600 line-clamp-2">{event.description}</p>
