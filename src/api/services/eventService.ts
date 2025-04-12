@@ -1,5 +1,7 @@
 import { eventParticipantRepository } from "../repositories/eventParticipantRepository";
 import { Event, eventRepository } from "../repositories/eventRepository";
+import { giftRepository } from "../repositories/giftRepository";
+import { userRepository } from "../repositories/userRepository";
 
 /**
  * 이벤트 서비스
@@ -127,6 +129,59 @@ export const eventService = {
     } catch (error) {
       console.error(
         `사용자 참여 이벤트 목록 조회 실패 (User ID: ${userId}):`,
+        error
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * 이벤트 참가자 목록 조회 (선물 선택 정보 포함)
+   */
+  async getEventParticipantsWithGiftStatus(eventId: string): Promise<
+    {
+      id: string;
+      user_id: string;
+      username: string | null;
+      has_selected_gift: boolean;
+    }[]
+  > {
+    try {
+      // 1. 이벤트 참가자 목록 조회
+      const participants =
+        await eventParticipantRepository.getEventParticipants(eventId);
+
+      if (!participants.length) {
+        return [];
+      }
+
+      // 2. 참가자들에 대한 선물 선택 여부 확인 및 사용자 정보 조회
+      const participantsWithInfo = await Promise.all(
+        participants.map(async (participant) => {
+          // 2-1. 사용자 정보 조회
+          const userProfile = await userRepository.getUser(participant.user_id);
+
+          // 2-2. 사용자가 이 이벤트에서 선물을 선택했는지 확인
+          const { received } = await giftRepository.getUserGifts(
+            participant.user_id
+          );
+          const hasSelectedGift = received.some(
+            (gift) => gift.event_id === eventId
+          );
+
+          return {
+            id: participant.id,
+            user_id: participant.user_id,
+            username: userProfile?.username || null,
+            has_selected_gift: hasSelectedGift,
+          };
+        })
+      );
+
+      return participantsWithInfo;
+    } catch (error) {
+      console.error(
+        `이벤트 참가자 목록 조회 실패 (Event ID: ${eventId}):`,
         error
       );
       throw error;

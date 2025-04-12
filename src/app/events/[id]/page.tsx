@@ -17,6 +17,14 @@ interface EventDetailPageProps {
   }>;
 }
 
+// 참가자 정보 인터페이스
+interface ParticipantInfo {
+  id: string;
+  user_id: string;
+  username: string | null;
+  has_selected_gift: boolean;
+}
+
 export default function EventDetailPage({ params }: EventDetailPageProps) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
@@ -30,6 +38,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [isParticipant, setIsParticipant] = useState(false);
   const [userSelectedGift, setUserSelectedGift] =
     useState<AnonymousGift | null>(null);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
 
   // params 처리
   useEffect(() => {
@@ -98,6 +107,11 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
         user.id
       );
       setUserSelectedGift(selectedGift);
+
+      // 6. 이벤트 참가자 목록 조회
+      const participantsList =
+        await eventService.getEventParticipantsWithGiftStatus(eventId);
+      setParticipants(participantsList);
     } catch (error) {
       console.error("이벤트 상세 정보 조회 실패:", error);
       setError("이벤트 정보를 불러오는 중 오류가 발생했습니다.");
@@ -142,6 +156,13 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
       // 선택한 선물 목록에서 제거
       setGifts(gifts.filter((gift) => gift.id !== selectedGift));
       setSelectedGift(null);
+
+      // 참가자 목록에서 현재 사용자의 선물 선택 상태 업데이트
+      setParticipants((prevParticipants) =>
+        prevParticipants.map((p) =>
+          p.user_id === user.id ? { ...p, has_selected_gift: true } : p
+        )
+      );
     } catch (error) {
       console.error("선물 선택 실패:", error);
       alert("선물 선택에 실패했습니다. 다시 시도해주세요.");
@@ -291,24 +312,72 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow h-min">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              선물 등록
-            </h2>
+          <div className="space-y-6">
+            {/* 선물 등록 섹션 */}
+            <div className="bg-white p-6 rounded-lg shadow h-min">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                선물 등록
+              </h2>
 
-            {userHasGift ? (
-              <p className="text-gray-500">이미 선물을 등록하셨습니다.</p>
-            ) : (
-              <div>
-                <p className="text-gray-600 mb-4">
-                  본 이벤트에 선물을 등록하고 다른 참여자의 선물을 선택할 수
-                  있습니다.
-                </p>
-                <Link href={`/events/${eventId}/register-gift`} passHref>
-                  <Button className="w-full">선물 등록하기</Button>
-                </Link>
-              </div>
-            )}
+              {userHasGift ? (
+                <p className="text-gray-500">이미 선물을 등록하셨습니다.</p>
+              ) : (
+                <div>
+                  <p className="text-gray-600 mb-4">
+                    본 이벤트에 선물을 등록하고 다른 참여자의 선물을 선택할 수
+                    있습니다.
+                  </p>
+                  <Link href={`/events/${eventId}/register-gift`} passHref>
+                    <Button className="w-full">선물 등록하기</Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* 참가자 목록 섹션 */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                참가자 목록
+              </h2>
+
+              {participants.length === 0 ? (
+                <p className="text-gray-500">참가자가 없습니다.</p>
+              ) : (
+                <ul className="divide-y divide-gray-200">
+                  {participants.map((participant) => (
+                    <li
+                      key={participant.id}
+                      className="py-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-sm font-medium text-indigo-800">
+                            {participant.username
+                              ? participant.username.charAt(0).toUpperCase()
+                              : "?"}
+                          </span>
+                        </div>
+                        <span className="text-gray-800">
+                          {participant.username || "익명 사용자"}
+                          {participant.user_id === user?.id && " (나)"}
+                        </span>
+                      </div>
+                      <div>
+                        {participant.has_selected_gift ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            선물 선택 완료
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            선택 대기 중
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       )}
