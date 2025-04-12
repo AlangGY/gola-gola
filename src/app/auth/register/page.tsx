@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRandomNickname } from "@woowa-babble/random-nickname";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export default function Register() {
+interface RegisterPageProps {
+  searchParams: Promise<{
+    code?: string;
+  }>;
+}
+
+export default function Register({ searchParams }: RegisterPageProps) {
   const { signup } = useAuth();
-  const searchParams = useSearchParams();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -22,16 +26,22 @@ export default function Register() {
 
   // URL 쿼리 파라미터에서 초대 코드 가져오기
   useEffect(() => {
-    const codeFromQuery = searchParams.get("code");
-    if (codeFromQuery) {
-      setInviteCode(codeFromQuery.toUpperCase());
+    const resolveSearchParams = async () => {
+      const resolvedSearchParams =
+        searchParams instanceof Promise ? await searchParams : searchParams;
+      const codeFromQuery = resolvedSearchParams.code;
+      if (codeFromQuery) {
+        setInviteCode(codeFromQuery.toUpperCase());
 
-      // 자동으로 초대 코드 검증
-      if (codeFromQuery.trim() !== "") {
-        setIsAutoVerifying(true);
-        verifyInviteCodeInternal(codeFromQuery);
+        // 자동으로 초대 코드 검증
+        if (codeFromQuery.trim() !== "") {
+          setIsAutoVerifying(true);
+          verifyInviteCodeInternal(codeFromQuery);
+        }
       }
-    }
+    };
+
+    resolveSearchParams();
   }, [searchParams]);
 
   const verifyInviteCodeInternal = async (code: string) => {

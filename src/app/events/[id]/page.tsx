@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface EventDetailPageProps {
   params: Promise<{
@@ -40,6 +40,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     useState<AnonymousGift | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const POLLING_INTERVAL = 5000; // 5초마다 폴링
 
   // params 처리
   useEffect(() => {
@@ -57,6 +60,69 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     resolveParams();
   }, [params]);
 
+  // 이벤트 디테일 및 관련 데이터 조회 함수를 useCallback으로 메모이제이션
+  const fetchEventDetails = useCallback(
+    async (showLoading = true) => {
+      if (!user || !eventId) return;
+
+      try {
+        if (showLoading) {
+          setLoading(true);
+        }
+        setError(null);
+
+        // 1. 이벤트 정보 조회
+        const eventDetails = await eventService.getEventDetail(eventId);
+        if (!eventDetails) {
+          setError("이벤트를 찾을 수 없습니다.");
+          return;
+        }
+        setEvent(eventDetails);
+
+        // 2. 사용자가 이벤트 참가자인지 확인
+        const participantCheck = await eventParticipantRepository.isParticipant(
+          eventId,
+          user.id
+        );
+        setIsParticipant(participantCheck);
+
+        // 3. 사용자가 이미 선물을 등록했는지 확인
+        const hasGift = await giftService.hasUserRegisteredGift(
+          eventId,
+          user.id
+        );
+        setUserHasGift(hasGift);
+
+        // 4. 이벤트 선물 목록 조회
+        const giftList = await giftService.getAvailableGifts(eventId);
+        setGifts(giftList);
+
+        // 5. 사용자가 이미 선택한 선물이 있는지 확인
+        const selectedGift = await giftService.getUserSelectedGift(
+          eventId,
+          user.id
+        );
+        setUserSelectedGift(selectedGift);
+
+        // 6. 이벤트 참가자 목록 조회
+        const participantsList =
+          await eventService.getEventParticipantsWithGiftStatus(eventId);
+        setParticipants(participantsList);
+      } catch (error) {
+        console.error("이벤트 상세 정보 조회 실패:", error);
+        if (showLoading) {
+          setError("이벤트 정보를 불러오는 중 오류가 발생했습니다.");
+        }
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    [eventId, user]
+  );
+
+  // 초기 데이터 로드
   useEffect(() => {
     // 이벤트 ID가 없거나 사용자 로드 중이면 실행하지 않음
     if (!eventId || isAuthLoading) return;
@@ -70,56 +136,52 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     }
 
     fetchEventDetails();
-  }, [eventId, user, isAuthLoading, router]);
+  }, [eventId, user, isAuthLoading, router, fetchEventDetails]);
 
-  const fetchEventDetails = async () => {
-    if (!user || !eventId) return;
+  // 폴링 설정
+  useEffect(() => {
+    const startPolling = () => {
+      if (isPolling || !user || !eventId || !isParticipant) return;
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 1. 이벤트 정보 조회
-      const eventDetails = await eventService.getEventDetail(eventId);
-      if (!eventDetails) {
-        setError("이벤트를 찾을 수 없습니다.");
-        return;
+      // 이미 진행 중인 폴링이 있으면 제거
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
       }
-      setEvent(eventDetails);
 
-      // 2. 사용자가 이벤트 참가자인지 확인
-      const participantCheck = await eventParticipantRepository.isParticipant(
-        eventId,
-        user.id
-      );
-      setIsParticipant(participantCheck);
+      // 새로운 폴링 시작
+      setIsPolling(true);
+      pollingIntervalRef.current = setInterval(() => {
+        console.log("이벤트 데이터 폴링 중...");
+        fetchEventDetails(false); // 로딩 표시 없이 조용히 업데이트
+      }, POLLING_INTERVAL);
+    };
 
-      // 3. 사용자가 이미 선물을 등록했는지 확인
-      const hasGift = await giftService.hasUserRegisteredGift(eventId, user.id);
-      setUserHasGift(hasGift);
-
-      // 4. 이벤트 선물 목록 조회
-      const giftList = await giftService.getAvailableGifts(eventId);
-      setGifts(giftList);
-
-      // 5. 사용자가 이미 선택한 선물이 있는지 확인
-      const selectedGift = await giftService.getUserSelectedGift(
-        eventId,
-        user.id
-      );
-      setUserSelectedGift(selectedGift);
-
-      // 6. 이벤트 참가자 목록 조회
-      const participantsList =
-        await eventService.getEventParticipantsWithGiftStatus(eventId);
-      setParticipants(participantsList);
-    } catch (error) {
-      console.error("이벤트 상세 정보 조회 실패:", error);
-      setError("이벤트 정보를 불러오는 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
+    // 사용자가 로그인하고 이벤트 참가자인 경우 폴링 시작
+    if (user && eventId && isParticipant && !isPolling && !loading) {
+      startPolling();
     }
-  };
+
+    // 클린업 함수
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        setIsPolling(false);
+      }
+    };
+  }, [user, eventId, isParticipant, isPolling, loading, fetchEventDetails]);
+
+  // 이벤트가 완료되거나 취소된 경우 폴링 중지
+  useEffect(() => {
+    if (
+      event &&
+      (event.status === "completed" || event.status === "cancelled")
+    ) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        setIsPolling(false);
+      }
+    }
+  }, [event]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -164,6 +226,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
           p.user_id === user.id ? { ...p, has_selected_gift: true } : p
         )
       );
+
+      // 실시간 데이터 갱신
+      await fetchEventDetails(false);
     } catch (error) {
       console.error("선물 선택 실패:", error);
       alert("선물 선택에 실패했습니다. 다시 시도해주세요.");
@@ -205,6 +270,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
       // 확인 대화상자 닫기
       setShowCancelConfirm(false);
+
+      // 실시간 데이터 갱신
+      await fetchEventDetails(false);
     } catch (error) {
       console.error("선물 선택 취소 실패:", error);
       alert("선물 선택 취소에 실패했습니다. 다시 시도해주세요.");
