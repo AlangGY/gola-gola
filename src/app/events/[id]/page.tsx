@@ -39,6 +39,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [userSelectedGift, setUserSelectedGift] =
     useState<AnonymousGift | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // params 처리
   useEffect(() => {
@@ -169,6 +170,48 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     }
   };
 
+  // 선물 선택 취소 확인 대화상자 표시
+  const openCancelConfirm = () => {
+    setShowCancelConfirm(true);
+  };
+
+  // 선물 선택 취소 확인 대화상자 닫기
+  const closeCancelConfirm = () => {
+    setShowCancelConfirm(false);
+  };
+
+  // 선물 선택 취소 처리 함수
+  const handleCancelSelection = async () => {
+    if (!userSelectedGift || !user || !eventId) return;
+
+    try {
+      await giftService.cancelSelectedGift(userSelectedGift.id, user.id);
+
+      // 취소한 선물을 선택 가능한 목록에 다시 추가
+      setGifts((prevGifts) => [
+        ...prevGifts,
+        { ...userSelectedGift, status: "available" },
+      ]);
+
+      // 사용자가 선택한 선물 정보 초기화
+      setUserSelectedGift(null);
+
+      // 참가자 목록에서 현재 사용자의 선물 선택 상태 업데이트
+      setParticipants((prevParticipants) =>
+        prevParticipants.map((p) =>
+          p.user_id === user.id ? { ...p, has_selected_gift: false } : p
+        )
+      );
+
+      // 확인 대화상자 닫기
+      setShowCancelConfirm(false);
+    } catch (error) {
+      console.error("선물 선택 취소 실패:", error);
+      alert("선물 선택 취소에 실패했습니다. 다시 시도해주세요.");
+      setShowCancelConfirm(false);
+    }
+  };
+
   if (loading || isAuthLoading || !eventId) {
     return (
       <div className="py-12 text-center">
@@ -195,6 +238,34 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
   return (
     <div>
+      {/* 선물 선택 취소 확인 모달 */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold mb-3">선물 선택 취소</h3>
+            <p className="mb-4 text-gray-600">
+              선택한 선물을 취소하시겠습니까? 취소 후에는 다른 선물을 선택할 수
+              있습니다.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                className="text-gray-600"
+                onClick={closeCancelConfirm}
+              >
+                아니오
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700"
+                onClick={handleCancelSelection}
+              >
+                예, 취소합니다
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6">
         <Link
           href="/events"
@@ -256,6 +327,16 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
                       선택됨
                     </span>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-auto"
+                      onClick={openCancelConfirm}
+                    >
+                      선물 선택 취소
+                    </Button>
                   </div>
                 </div>
               </div>

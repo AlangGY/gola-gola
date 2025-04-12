@@ -96,6 +96,24 @@ export const giftRepository = {
 
     if (error) throw error;
   },
+
+  /**
+   * 선물 선택 취소
+   */
+  async cancelGiftSelection(giftId: string, userId: string): Promise<void> {
+    // 선택한 사용자가 맞는지 확인 후 취소
+    const { error } = await supabase
+      .from("gifts")
+      .update({
+        received_by: null,
+        status: "available",
+      })
+      .eq("id", giftId)
+      .eq("received_by", userId) // 해당 사용자가 선택한 선물만 취소 가능
+      .eq("status", "selected");
+
+    if (error) throw error;
+  },
 };
 
 function shuffleArray<T>(array: T[]): T[] {

@@ -120,4 +120,16 @@ export const giftService = {
       throw error;
     }
   },
+
+  /**
+   * 선택한 선물 취소
+   */
+  async cancelSelectedGift(giftId: string, userId: string): Promise<void> {
+    try {
+      await giftRepository.cancelGiftSelection(giftId, userId);
+    } catch (error) {
+      console.error(`선물 선택 취소 실패 (Gift ID: ${giftId}):`, error);
+      throw error;
+    }
+  },
 };
